@@ -1,4 +1,25 @@
 # TraceLens
+
+TraceLens is a lightweight DFIR triage tool that analyzes Windows Security Event Logs and turns raw evidence into a human-readable risk report within seconds.
+
+No SIEM.
+No agent.
+Just logs.
+
+---
+
+## Quick start
+```powershell
+# Export Security log (Windows)
+wevtutil qe Security /f:xml /c:30000 | Out-File .\output\security_30k.xml -Encoding utf8
+
+# Scan + generate HTML report
+python .\tracelens.py scan .\output\security_30k.xml --html
+
+# Open report
+start .\reports\tracelens_report.html
+
+# TraceLens
 Windows Event Log First Response & Triage Tool (EVTX)
 
 > You don’t read logs. You see intent.
