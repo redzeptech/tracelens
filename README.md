@@ -1,4 +1,5 @@
 # TraceLens
+![TraceLens Demo](TraceLens Raporu.png)
 
 TraceLens is a lightweight DFIR triage tool that analyzes Windows Security Event Logs and turns raw evidence into a human-readable risk report within seconds.
 
