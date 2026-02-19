@@ -75,10 +75,6 @@ Brute-force: NOT SUSPECTED | 4625 in last 10 min = 1 (threshold 20)
 Top targeted user: Recep (1)
 Top source IP: (not present in events)
 
-> Not: Sayılar sende farklıysa sorun değil — istersen bu kısmı “example” diye de yazabiliriz. Şimdilik böyle kalsın.
-
-Kaydet, kapat.
-
 ---
 
 ## 3) Test et (çıktı artık daha tok olacak)
