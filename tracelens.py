@@ -75,6 +75,8 @@ def scan(path: str):
         return 2
 
     counts = {eid: 0 for eid in WATCH}
+    total_events = 0
+
 
     fail_times = []
     fail_users = Counter()
@@ -82,6 +84,8 @@ def scan(path: str):
 
     for xf in xml_files:
         for ev in iter_events_from_xml(xf):
+            total_events += 1
+
             if ev.event_id in WATCH:
                 counts[ev.event_id] += 1
 
@@ -125,6 +129,7 @@ def scan(path: str):
     print(f"[+] Target: {p.resolve()}")
     print("")
     print(f"RISK SCORE: {score}/100 ({label})")
+    print(f"Total events parsed: {total_events}")
     print("Event counts:")
     for eid in sorted(WATCH):
         c = counts.get(eid, 0)
@@ -133,13 +138,24 @@ def scan(path: str):
 
     print("")
     if fail_times:
-        print(f"4625 burst (last {bf_window_min} min): {bf_count} (threshold: {bf_threshold})")
-        if fail_users:
-            u, c = fail_users.most_common(1)[0]
-            print(f"Top targeted user: {u} ({c})")
-        if fail_ips:
-            ip, c = fail_ips.most_common(1)[0]
-            print(f"Top source IP: {ip} ({c})")
+    status = "SUSPECTED" if bruteforce_suspected else "NOT SUSPECTED"
+    print(f"Brute-force: {status} | 4625 in last {bf_window_min} min = {bf_count} (threshold {bf_threshold})")
+
+    if fail_users:
+        u, c = fail_users.most_common(1)[0]
+        print(f"Top targeted user: {u} ({c})")
+    else:
+        print("Top targeted user: (not present in events)")
+
+    if fail_ips:
+        ip, c = fail_ips.most_common(1)[0]
+        print(f"Top source IP: {ip} ({c})")
+    else:
+        print("Top source IP: (not present in events)")
+
+            else:
+    print("Top source IP: (not present in events)")
+
 
     print("")
     print("[i] Next: HTML report + MITRE mapping + timeline export")
