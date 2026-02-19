@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Optional, Dict
 from pathlib import Path
@@ -77,22 +77,23 @@ def iter_events_from_xml(xml_file: str | Path) -> Iterable[WinEvent]:
                 frag.encode("utf-8"),
                 parser=etree.XMLParser(recover=True, huge_tree=True),
             )
-        except Exception:
-            continue
 
-        try:
             event_id_txt = _findtext_any(elem, ["e:System/e:EventID", "./System/EventID"])
             if not event_id_txt:
                 continue
             event_id = int(event_id_txt)
 
-            tc = elem.find(".//e:System/e:TimeCreated", namespaces=NS) or elem.find(".//System/TimeCreated")
+            tc = elem.find(".//e:System/e:TimeCreated", namespaces=NS)
+            if tc is None:
+                tc = elem.find(".//System/TimeCreated")
             time_created = tc.get("SystemTime") if tc is not None else ""
 
             computer = _findtext_any(elem, ["e:System/e:Computer", "./System/Computer"])
             channel = _findtext_any(elem, ["e:System/e:Channel", "./System/Channel"])
 
-            provider_node = elem.find(".//e:System/e:Provider", namespaces=NS) or elem.find(".//System/Provider")
+            provider_node = elem.find(".//e:System/e:Provider", namespaces=NS)
+            if provider_node is None:
+                provider_node = elem.find(".//System/Provider")
             provider = provider_node.get("Name") if provider_node is not None else ""
 
             record_id_txt = _findtext_any(elem, ["e:System/e:EventRecordID", "./System/EventRecordID"])
