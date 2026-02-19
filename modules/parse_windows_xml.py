@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Optional, Dict
 from pathlib import Path
@@ -19,60 +19,86 @@ class WinEvent:
 
 def _event_data_map(elem) -> Dict[str, str]:
     data = {}
-    for d in elem.findall("e:EventData/e:Data", namespaces=NS):
+    for d in elem.findall(".//e:EventData/e:Data", namespaces=NS):
         name = d.get("Name")
         if name:
             data[name] = (d.text or "").strip()
+    if not data:
+        for d in elem.findall(".//EventData/Data"):
+            name = d.get("Name")
+            if name:
+                data[name] = (d.text or "").strip()
     return data
+
+def _findtext_any(elem, paths: list[str]) -> str:
+    for xp in paths:
+        r = elem.findtext(xp, namespaces=NS)
+        if r:
+            return r
+    for xp in paths:
+        r = elem.findtext(xp.replace("e:", ""), namespaces=None)
+        if r:
+            return r
+    return ""
+
+def _iter_event_fragments(file_path: Path, chunk_size: int = 1024 * 1024) -> Iterable[str]:
+    start_tag = "<Event"
+    end_tag = "</Event>"
+    buf = ""
+
+    with file_path.open("r", encoding="utf-8", errors="ignore") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            buf += chunk
+
+            while True:
+                s = buf.find(start_tag)
+                if s == -1:
+                    buf = buf[-len(start_tag):]
+                    break
+
+                e = buf.find(end_tag, s)
+                if e == -1:
+                    buf = buf[s:]
+                    break
+
+                frag = buf[s : e + len(end_tag)]
+                buf = buf[e + len(end_tag):]
+                yield frag
 
 def iter_events_from_xml(xml_file: str | Path) -> Iterable[WinEvent]:
     xml_file = Path(xml_file)
 
-    # IMPORTANT: don't filter by tag here; some exports vary in namespaces.
-    context = etree.iterparse(
-        str(xml_file),
-        events=("end",),
-        recover=True,
-        huge_tree=True,
-    )
-
-    for _, elem in context:
+    for frag in _iter_event_fragments(xml_file):
         try:
-            # Accept both namespaced and non-namespaced Event tags
-            if not (elem.tag == "Event" or str(elem.tag).endswith("}Event")):
-                continue
+            elem = etree.fromstring(
+                frag.encode("utf-8"),
+                parser=etree.XMLParser(recover=True, huge_tree=True),
+            )
+        except Exception:
+            continue
 
-            # Try namespaced paths first
-            event_id_txt = elem.findtext("e:System/e:EventID", namespaces=NS)
-            if not event_id_txt:
-                # Fallback without namespace
-                event_id_txt = elem.findtext("./System/EventID")
-
+        try:
+            event_id_txt = _findtext_any(elem, ["e:System/e:EventID", "./System/EventID"])
             if not event_id_txt:
                 continue
             event_id = int(event_id_txt)
 
-            tc = elem.find("e:System/e:TimeCreated", namespaces=NS)
-            if tc is None:
-                tc = elem.find("./System/TimeCreated")
+            tc = elem.find(".//e:System/e:TimeCreated", namespaces=NS) or elem.find(".//System/TimeCreated")
             time_created = tc.get("SystemTime") if tc is not None else ""
 
-            computer = elem.findtext("e:System/e:Computer", namespaces=NS) or elem.findtext("./System/Computer") or ""
-            channel = elem.findtext("e:System/e:Channel", namespaces=NS) or elem.findtext("./System/Channel") or ""
-            provider_node = elem.find("e:System/e:Provider", namespaces=NS) or elem.find("./System/Provider")
+            computer = _findtext_any(elem, ["e:System/e:Computer", "./System/Computer"])
+            channel = _findtext_any(elem, ["e:System/e:Channel", "./System/Channel"])
+
+            provider_node = elem.find(".//e:System/e:Provider", namespaces=NS) or elem.find(".//System/Provider")
             provider = provider_node.get("Name") if provider_node is not None else ""
 
-            record_id_txt = elem.findtext("e:System/e:EventRecordID", namespaces=NS) or elem.findtext("./System/EventRecordID")
-            record_id = int(record_id_txt) if record_id_txt and record_id_txt.isdigit() else None
+            record_id_txt = _findtext_any(elem, ["e:System/e:EventRecordID", "./System/EventRecordID"])
+            record_id = int(record_id_txt) if record_id_txt.isdigit() else None
 
             data = _event_data_map(elem)
-            if not data:
-                # Fallback: non-namespaced EventData
-                data = {}
-                for d in elem.findall("./EventData/Data"):
-                    name = d.get("Name")
-                    if name:
-                        data[name] = (d.text or "").strip()
 
             yield WinEvent(
                 event_id=event_id,
@@ -84,7 +110,5 @@ def iter_events_from_xml(xml_file: str | Path) -> Iterable[WinEvent]:
                 data=data,
                 xml_path=str(xml_file),
             )
-        finally:
-            elem.clear()
-            while elem.getprevious() is not None:
-                del elem.getparent()[0]
+        except Exception:
+            continue
